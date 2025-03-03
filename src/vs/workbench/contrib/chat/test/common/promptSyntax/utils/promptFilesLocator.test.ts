@@ -110,32 +110,6 @@ suite('PromptFilesLocator', () => {
 				);
 			});
 
-			test('• object config value', async () => {
-				const locator = await createPromptsLocator({
-					'/Users/legomushroom/repos/prompts/': true,
-					'/tmp/prompts/': false,
-				}, EMPTY_WORKSPACE, []);
-
-				assert.deepStrictEqual(
-					await locator.listFiles([]),
-					[],
-					'No prompts must be found.',
-				);
-			});
-
-			test('• array config value', async () => {
-				const locator = await createPromptsLocator([
-					'relative/path/to/prompts/',
-					'/abs/path',
-				], EMPTY_WORKSPACE, []);
-
-				assert.deepStrictEqual(
-					await locator.listFiles([]),
-					[],
-					'No prompts must be found.',
-				);
-			});
-
 			test('• null config value', async () => {
 				const locator = await createPromptsLocator(null, EMPTY_WORKSPACE, []);
 
@@ -146,8 +120,11 @@ suite('PromptFilesLocator', () => {
 				);
 			});
 
-			test('• string config value', async () => {
-				const locator = await createPromptsLocator('/etc/hosts/prompts', EMPTY_WORKSPACE, []);
+			test('• object config value', async () => {
+				const locator = await createPromptsLocator({
+					[createURI('/Users/legomushroom/repos/prompts/').path]: true,
+					[createURI('/tmp/prompts/').path]: false,
+				}, EMPTY_WORKSPACE, []);
 
 				assert.deepStrictEqual(
 					await locator.listFiles([]),
@@ -161,15 +138,15 @@ suite('PromptFilesLocator', () => {
 			test('• object config value', async () => {
 				const locator = await createPromptsLocator(
 					{
-						'/Users/legomushroom/repos/prompts': true,
-						'/tmp/prompts/': true,
-						'/absolute/path/prompts': false,
-						'.copilot/prompts': true,
+						[createURI('/Users/legomushroom/repos/prompts').path]: true,
+						[createURI('/tmp/prompts/').path]: true,
+						[createURI('/absolute/path/prompts').path]: false,
+						['.copilot/prompts']: true,
 					},
 					EMPTY_WORKSPACE,
 					[
 						{
-							name: '/Users/legomushroom/repos/prompts',
+							name: createURI('/Users/legomushroom/repos/prompts').path,
 							children: [
 								{
 									name: 'test.prompt.md',
@@ -182,7 +159,7 @@ suite('PromptFilesLocator', () => {
 							],
 						},
 						{
-							name: '/tmp/prompts',
+							name: createURI('/tmp/prompts').path,
 							children: [
 								{
 									name: 'translate.to-rust.prompt.md',
@@ -191,7 +168,7 @@ suite('PromptFilesLocator', () => {
 							],
 						},
 						{
-							name: '/absolute/path/prompts',
+							name: createURI('/absolute/path/prompts').path,
 							children: [
 								{
 									name: 'some-prompt-file.prompt.md',
