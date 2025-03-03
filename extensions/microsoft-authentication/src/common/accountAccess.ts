@@ -46,7 +46,15 @@ export class ScopedAccountAccess implements IAccountAccess {
 			await this._accountAccessSecretStorage.store([...this.value, account.homeAccountId]);
 			return;
 		}
-		await this._accountAccessSecretStorage.store(this.value.filter(id => id !== account.homeAccountId));
+		const newValue = this.value.filter(id => id !== account.homeAccountId);
+		if (newValue.length === this.value.length) {
+			return;
+		}
+		if (newValue.length) {
+			await this._accountAccessSecretStorage.store(newValue);
+		} else {
+			await this._accountAccessSecretStorage.delete();
+		}
 	}
 
 	private async update() {
@@ -66,7 +74,9 @@ export class AccountAccessSecretStorage {
 	private readonly _onDidChangeEmitter = new EventEmitter<void>;
 	readonly onDidChange: Event<void> = this._onDidChangeEmitter.event;
 
-	private readonly _key = `accounts-${this._cloudName}-${this._clientId}-${this._authority}`;
+	// TODO@TylerLeonhardt: Remove legacy key in next version
+	private readonly _legacyKey = `accounts-${this._cloudName}-${this._clientId}-${this._authority}`;
+	private readonly _key = `accounts-${this._cloudName}`;
 
 	constructor(
 		private readonly _secretStorage: SecretStorage,
@@ -77,7 +87,7 @@ export class AccountAccessSecretStorage {
 		this._disposable = Disposable.from(
 			this._onDidChangeEmitter,
 			this._secretStorage.onDidChange(e => {
-				if (e.key === this._key) {
+				if (e.key === this._key || e.key === this._legacyKey) {
 					this._onDidChangeEmitter.fire();
 				}
 			})
@@ -86,18 +96,35 @@ export class AccountAccessSecretStorage {
 
 	async get(): Promise<string[] | undefined> {
 		const value = await this._secretStorage.get(this._key);
-		if (!value) {
-			return undefined;
+		if (value) {
+			return JSON.parse(value);
 		}
-		return JSON.parse(value);
+		// TODO@TylerLeonhardt: Remove legacy fallback in next version
+		const legacyValue = await this._secretStorage.get(this._legacyKey);
+		if (legacyValue) {
+			// Update the new store with the legacy value
+			const parsedValue = JSON.parse(legacyValue);
+			await this._secretStorage.store(this._key, legacyValue);
+			return parsedValue;
+		}
+		return undefined;
 	}
 
-	store(value: string[]): Thenable<void> {
-		return this._secretStorage.store(this._key, JSON.stringify(value));
+	async store(value: string[]): Promise<void> {
+		const stringified = JSON.stringify(value);
+		// TODO@TylerLeonhardt: Remove legacy storage in next version
+		await Promise.all([
+			this._secretStorage.store(this._key, stringified),
+			this._secretStorage.store(this._legacyKey, stringified)
+		]);
 	}
 
-	delete(): Thenable<void> {
-		return this._secretStorage.delete(this._key);
+	async delete(): Promise<void> {
+		// TODO@TylerLeonhardt: Remove legacy deletion in next version
+		await Promise.all([
+			this._secretStorage.delete(this._key),
+			this._secretStorage.delete(this._legacyKey)
+		]);
 	}
 
 	dispose() {
